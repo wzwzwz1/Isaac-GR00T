@@ -289,6 +289,16 @@ class DiT(ModelMixin, ConfigMixin):
             sum(p.numel() for p in self.parameters() if p.requires_grad),
         )
 
+        # ── NPU Attention 优化 (opt-in): 设置 GR00T_ENABLE_NPU_PFA=1 启用 ──
+        # 注意: 对 DiT 的小 attention shapes (Sq=17, D=48), PFA 比手工 SDPA 慢
+        # 仅对 seq_len > 128 的大模型场景有用. 此处保留代码供未来优化参考.
+        if os.environ.get("GR00T_ENABLE_NPU_PFA", "0") == "1":
+            try:
+                from gr00t.model.modules.attention_processors import set_npu_attention_processors
+                set_npu_attention_processors(self)
+            except Exception:
+                pass
+
     def forward(
         self,
         hidden_states: torch.Tensor,  # Shape: (B, T, D)

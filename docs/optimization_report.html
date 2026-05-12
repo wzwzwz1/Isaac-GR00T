@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GR00T-N1.6 昇腾NPU 推理优化分析报告</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #212529; line-height: 1.6; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+    h1 { font-size: 1.8em; margin-bottom: 5px; }
+    h2 { font-size: 1.4em; margin: 30px 0 15px; border-bottom: 2px solid #0d6efd; padding-bottom: 8px; }
+    h3 { font-size: 1.1em; margin: 20px 0 10px; }
+    .subtitle { color: #6c757d; margin-bottom: 20px; }
+
+    .card { background: white; border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .metric { background: white; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .metric .value { font-size: 2em; font-weight: 700; color: #0d6efd; }
+    .metric .label { font-size: 0.85em; color: #6c757d; margin-top: 5px; }
+
+    /* Waterfall */
+    .waterfall-item { display: flex; align-items: center; margin: 6px 0; gap: 12px; }
+    .wf-label { width: 180px; font-size: 0.85em; font-weight: 500; text-align: right; flex-shrink: 0; }
+    .wf-bar-container { flex: 1; background: #e9ecef; border-radius: 4px; height: 22px; overflow: hidden; }
+    .wf-bar { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .wf-value { width: 70px; font-size: 0.9em; font-weight: 600; text-align: right; }
+    .wf-p95 { width: 80px; font-size: 0.8em; color: #6c757d; }
+
+    /* Stage percentage */
+    .pct-item { display: flex; align-items: center; margin: 5px 0; gap: 10px; }
+    .pct-label { width: 160px; font-size: 0.85em; text-align: right; flex-shrink: 0; }
+    .pct-bar-bg { flex: 1; background: #e9ecef; border-radius: 4px; height: 18px; overflow: hidden; }
+    .pct-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #0d6efd, #dc3545); }
+    .pct-value { width: 50px; font-size: 0.9em; font-weight: 600; }
+
+    /* Advice cards */
+    .advice-card { background: white; border-radius: 10px; padding: 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .advice-card h4 { margin-bottom: 8px; }
+    .advice-card p { font-size: 0.92em; color: #495057; margin-bottom: 10px; }
+    .advice-card .meta { display: flex; gap: 20px; font-size: 0.85em; color: #6c757d; margin-bottom: 10px; }
+    .advice-card details { font-size: 0.9em; }
+    .advice-card ol { margin-left: 20px; }
+    .advice-card li { margin: 4px 0; }
+
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; text-align: center; border-bottom: 1px solid #dee2e6; }
+    .comparison-table th { background: #f0f2f5; font-weight: 600; font-size: 0.9em; }
+    .comparison-table .highlight { background: #fff3cd; font-weight: 600; }
+
+    .footer { text-align: center; color: #adb5bd; font-size: 0.8em; margin-top: 40px; padding: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>GR00T-N1.6-3B 推理优化分析报告</h1>
+    <p class="subtitle">设备: Ascend 310P3 | 模型: Gr00tN1d6 | 精度: FP16 | 生成时间: 自动</p>
+
+    <h2>1. 关键指标概览</h2>
+    <div class="metrics-grid">
+        <div class="metric">
+            <div class="value">603.6ms</div>
+            <div class="label">端到端平均延迟</div>
+        </div>
+        <div class="metric">
+            <div class="value">1.7 Hz</div>
+            <div class="label">吞吐量</div>
+        </div>
+    </div>
+
+    <h2>2. 管线阶段耗时分布</h2>
+    <div class="card">
+        <h3>时延瀑布图 (Waterfall)</h3>
+        <p style="color:#6c757d;font-size:0.85em;margin-bottom:12px;">各阶段的平均耗时对比</p>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">backbone</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:14.773473407747865%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">45.0ms</div>
+            <div class="wf-p95">p95: 50.0ms</div>
+        </div>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">encode_features</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:0.8207485226526592%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">2.5ms</div>
+            <div class="wf-p95">p95: 3.0ms</div>
+        </div>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">denoise_step_0</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:20.68286277084701%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">63.0ms</div>
+            <div class="wf-p95">p95: 68.0ms</div>
+        </div>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">denoise_step_1</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:20.51871306631648%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">62.5ms</div>
+            <div class="wf-p95">p95: 67.0ms</div>
+        </div>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">denoise_step_2</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:20.617202889034797%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">62.8ms</div>
+            <div class="wf-p95">p95: 68.5ms</div>
+        </div>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">denoise_step_3</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:20.748522652659222%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">63.2ms</div>
+            <div class="wf-p95">p95: 69.0ms</div>
+        </div>
+        
+        <div class="waterfall-item">
+            <div class="wf-label">total</div>
+            <div class="wf-bar-container">
+                <div class="wf-bar" style="width:100.0%; background: linear-gradient(90deg, #0d6efd, #dc3545);"></div>
+            </div>
+            <div class="wf-value">304.6ms</div>
+            <div class="wf-p95">p95: 312.0ms</div>
+        </div>
+        
+    </div>
+
+    <div class="card">
+        <h3>耗时占比</h3>
+        
+        <div class="pct-item">
+            <div class="pct-label">backbone</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:7.455268389662027%"></div>
+            </div>
+            <div class="pct-value">7.5%</div>
+        </div>
+        
+        <div class="pct-item">
+            <div class="pct-label">encode_features</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:0.414181577203446%"></div>
+            </div>
+            <div class="pct-value">0.4%</div>
+        </div>
+        
+        <div class="pct-item">
+            <div class="pct-label">denoise_step_0</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:10.43737574552684%"></div>
+            </div>
+            <div class="pct-value">10.4%</div>
+        </div>
+        
+        <div class="pct-item">
+            <div class="pct-label">denoise_step_1</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:10.354539430086149%"></div>
+            </div>
+            <div class="pct-value">10.4%</div>
+        </div>
+        
+        <div class="pct-item">
+            <div class="pct-label">denoise_step_2</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:10.404241219350563%"></div>
+            </div>
+            <div class="pct-value">10.4%</div>
+        </div>
+        
+        <div class="pct-item">
+            <div class="pct-label">denoise_step_3</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:10.470510271703116%"></div>
+            </div>
+            <div class="pct-value">10.5%</div>
+        </div>
+        
+        <div class="pct-item">
+            <div class="pct-label">total</div>
+            <div class="pct-bar-bg">
+                <div class="pct-bar" style="width:50.46388336646787%"></div>
+            </div>
+            <div class="pct-value">50.5%</div>
+        </div>
+        
+    </div>
+
+    <h2>3. 与 NVIDIA GPU 对比</h2>
+    <div class="card">
+        <table class="comparison-table">
+            <tr><th>硬件</th><th>延迟</th><th>吞吐量</th><th>相对 Ascend</th></tr>
+            <tr><td>H100 (torch.compile)</td><td>38 ms</td><td>26.3 Hz</td><td>8.0x 快</td></tr>
+            <tr><td>RTX 5090 (torch.compile)</td><td>37 ms</td><td>27.3 Hz</td><td>8.2x 快</td></tr>
+            <tr><td>RTX 4090 (torch.compile)</td><td>44 ms</td><td>22.8 Hz</td><td>6.9x 快</td></tr>
+            <tr><td>Jetson Thor (torch.compile)</td><td>105 ms</td><td>9.5 Hz</td><td>2.9x 快</td></tr>
+            <tr class="highlight"><td>Ascend 310P3 (本方案)</td><td>604 ms</td><td>1.7 Hz</td><td>基准</td></tr>
+        </table>
+    </div>
+
+    <h2>4. 优化建议 (按优先级排序)</h2>
+    
+        <div class="advice-card" style="border-left: 4px solid #dc3545">
+            <h4>[P1] ATC 模型编译 (OM 格式)</h4>
+            <p>使用昇腾 ATC (Ascend Tensor Compiler) 将 DiT 模型编译为 OM 离线模型。310P3 的 ATC 可进行算子融合、常数折叠、内存规划，预期 2-3x 加速。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 中 (2-3天)</span>
+                <span>📈 预期收益: 2-3x DiT 加速</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>export DiT to ONNX (torch.onnx.export)</li><li>atc --model=dit.onnx --framework=5 --output=dit_310p3 --soc_version=Ascend310P3</li><li>使用 ACL (AscendCL) C++ API 加载 OM 模型进行推理</li><li>注意: 需要将 DiT 从 Eagle backbone 中解耦, 分别推理</li></ol>
+            </details>
+        </div>
+        
+        <div class="advice-card" style="border-left: 4px solid #dc3545">
+            <h4>[P2] Ascend C 自定义 Attention 算子</h4>
+            <p>当前使用手工 matmul+softmax+matmul 实现 attention, 三次独立 kernel launch 且中间 attention scores 矩阵全部读写 HBM。用 Ascend C 编写 fused attention kernel, 将 Q*K^T + softmax + *V 融合为单 kernel, 在 L1 buffer 中完成在线计算。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 高 (1-2周)</span>
+                <span>📈 预期收益: DiT attention 部分 3-5x 加速</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>使用 Ascend C 编写 Flash-Attention-like kernel</li><li>利用 Tiling 将 QKV 分块加载到 L1 buffer</li><li>在 L1 中完成 online softmax + rescaling</li><li>通过 torch_npu.npu_jit_compile 或 pybind11 集成到 PyTorch</li></ol>
+            </details>
+        </div>
+        
+        <div class="advice-card" style="border-left: 4px solid #fd7e14">
+            <h4>[P3] NPU 算子融合优化</h4>
+            <p>torch_npu 提供了 npu_fused_attention 等融合算子。检查 torch_npu.npu_fused_attention 是否可以替代当前的手工 attention。此外对 AdaLayerNorm + Linear 等模式可以用 torch.compile(backend='aot_ts_npu') 或 torch_npu.npu_group_norm 融合。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 低 (1-2天)</span>
+                <span>📈 预期收益: 10-20% 延迟降低</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>尝试 torch_npu.npu_fused_attention(Q, K, V)</li><li>对 DiT 内部的小算子使用 torch_npu.npu_fusion_attention</li><li>测试 torch.compile 在 NPU 上的效果 (实验性)</li></ol>
+            </details>
+        </div>
+        
+        <div class="advice-card" style="border-left: 4px solid #fd7e14">
+            <h4>[P4] 减少去噪步数</h4>
+            <p>当前 num_inference_timesteps=4。尝试减少到 2 或 3 步, 使用蒸馏或微调恢复动作质量。可将 DiT 延迟减半。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 中 (需要重新训练/蒸馏)</span>
+                <span>📈 预期收益: 25-50% 总延迟降低</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>使用 1-2 步 teacher-forcing 蒸馏</li><li>或调整 noise schedule 为更高斯 (更少步数)</li><li>测试动作质量是否可接受</li></ol>
+            </details>
+        </div>
+        
+        <div class="advice-card" style="border-left: 4px solid #0d6efd">
+            <h4>[P5] 多 Stream 并行 (Backbone + Action Head)</h4>
+            <p>当前 backbone 和 action head 串行执行。如果有连续多帧推理, 可以使用双缓冲: backbone 处理下一帧时, action head 处理当前帧。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 中 (3-5天)</span>
+                <span>📈 预期收益: ~30% 吞吐提升 (对单帧延迟无帮助)</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>使用 torch.npu.Stream 创建两个 stream</li><li>在 stream1 运行 backbone(next_frame), stream2 运行 action_head(current_frame)</li><li>通过 event 同步确保依赖关系</li></ol>
+            </details>
+        </div>
+        
+        <div class="advice-card" style="border-left: 4px solid #0d6efd">
+            <h4>[P6] INT8 量化推理</h4>
+            <p>310P3 的 INT8 算力为 32 TOPS, 与 FP16 相同。但 INT8 可以: 1) 减少 50% 显存占用; 2) 减少显存带宽压力; 3) 允许更大 batch。对 memory-bound 的 attention 操作可能有帮助。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 中 (需要量化校准)</span>
+                <span>📈 预期收益: 10-20% 延迟降低 (attention 部分)</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>使用 NPU 量化工具 (amct) 对权重和激活进行 INT8 量化</li><li>校准数据集: 使用代表性的 backbone features</li><li>测试精度损失是否可接受</li></ol>
+            </details>
+        </div>
+        
+        <div class="advice-card" style="border-left: 4px solid #0d6efd">
+            <h4>[P7] 减少 Eagle LLM 层数</h4>
+            <p>当前 select_layer=16 (保留 16 层 LLM)。如果 backbone 耗时占比 > 40%, 可尝试 select_layer=12 或 8, 用更少的 LLM 层提取特征。对动作预测精度的影响需要通过实验验证。</p>
+            <div class="meta">
+                <span>🔧 实施难度: 低 (改配置即可)</span>
+                <span>📈 预期收益: 若 backbone 占 40%, 减少到 8 层可节省 ~20% backbone 延迟</span>
+            </div>
+            <details>
+                <summary>实施步骤</summary>
+                <ol><li>修改 config.json 中 select_layer 值</li><li>重新加载模型测试精度</li><li>权衡延迟 vs 精度</li></ol>
+            </details>
+        </div>
+        
+
+    <h2>5. 优化路线图 (推荐方案)</h2>
+    <div class="card">
+        <h3>阶段1: 快速见效 (1-2周)</h3>
+        <ol>
+            <li><strong>NPU 算子融合</strong>: 将 AdaLayerNorm+Linear 等模式用 torch_npu 融合算子替换 → 预计节省 10-20%</li>
+            <li><strong>减少 LLM 层数验证</strong>: 测试 select_layer=12/8 对精度的影响 → 若可行可节省 backbone 延迟</li>
+        </ol>
+
+        <h3>阶段2: 中等投入 (2-4周)</h3>
+        <ol>
+            <li><strong>ATC 模型编译</strong>: DiT 导出 ONNX → ATC 编译为 OM 格式 → 预计 2-3x DiT 加速</li>
+            <li><strong>去噪步数优化</strong>: 蒸馏或调参减少到 2-3 步 → 几乎线性减少 DiT 延迟</li>
+        </ol>
+
+        <h3>阶段3: 深度优化 (1-2月)</h3>
+        <ol>
+            <li><strong>Ascend C 自定义 Attention</strong>: 实现 Ascend C 版 Flash Attention → 预计 DiT attention 3-5x 加速</li>
+            <li><strong>多 Stream 流水线</strong>: Backbone 和 Action Head 流水线并行 → 吞吐提升</li>
+        </ol>
+    </div>
+
+    <div class="footer">
+        Generated by GR00T Profiling Toolkit | Ascend 310P3 Optimization Report
+    </div>
+</div>
+</body>
+</html>
