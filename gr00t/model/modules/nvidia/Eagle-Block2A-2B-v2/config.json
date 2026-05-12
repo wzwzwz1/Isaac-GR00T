@@ -46,12 +46,12 @@
     "rope_theta": 1000000,
     "sliding_window": null,
     "tie_word_embeddings": true,
-    "torch_dtype": "bfloat16",
+    "torch_dtype": "float16",
     "use_cache": false,
     "use_sliding_window": false,
     "vocab_size": 151680
   },
-  "torch_dtype": "bfloat16",
+  "torch_dtype": "float16",
   "transformers_version": null,
   "use_backbone_lora": 0,
   "use_llm_lora": 0,
@@ -76,7 +76,7 @@
     "num_hidden_layers": 27,
     "num_patches": 256,
     "patch_size": 14,
-    "torch_dtype": "bfloat16",
+    "torch_dtype": "float16",
     "use_rope": false,
     "use_windows_attn": false,
     "window_size": 14
