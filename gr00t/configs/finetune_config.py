@@ -14,6 +14,8 @@
 # limitations under the License.
 
 # Finetune config used for single node post-training.
+
+from __future__ import annotations
 from dataclasses import dataclass
 
 

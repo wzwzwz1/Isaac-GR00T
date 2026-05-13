@@ -17,6 +17,8 @@
 
 """Quick verification: compare PyTorch vs TRT action head outputs for N1.7."""
 
+
+from __future__ import annotations
 from dataclasses import dataclass
 import os
 import sys

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from typing import Any, Tuple
 
@@ -609,5 +611,6 @@ class Gr00tN1d7(PreTrainedModel):
 
 
 # Register the model with HuggingFace
+
 AutoConfig.register("Gr00tN1d7", Gr00tN1d7Config)
 AutoModel.register(Gr00tN1d7Config, Gr00tN1d7)

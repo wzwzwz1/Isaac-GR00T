@@ -171,3 +171,7 @@ offline_open_loop_eval_plots/
 atc_output/
 profiling_results/
 fusion_result.json
+eval_results/
+*.whl
+ge_check_op.json
+uv.toml

@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 """
 LeRobot Dataset Loader
 
@@ -48,6 +50,7 @@ from gr00t.utils.video_utils import get_frames_by_indices
 
 
 # LeRobot standard metadata filenames
+
 LEROBOT_META_DIR_NAME = "meta"
 LEROBOT_INFO_FILENAME = "info.json"
 LEROBOT_EPISODES_FILENAME = "episodes.jsonl"

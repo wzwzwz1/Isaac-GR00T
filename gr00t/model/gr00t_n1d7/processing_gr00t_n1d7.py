@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 from copy import deepcopy
 import json
 import os
@@ -50,6 +52,7 @@ except ImportError:
     Qwen3VLProcessor = None
 
 # Suppress protobuf deprecation warnings
+
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="google.protobuf")
 
 ### Mapping from embodiment tag to projector index.

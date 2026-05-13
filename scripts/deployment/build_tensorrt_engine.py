@@ -450,6 +450,8 @@ def build_full_pipeline(
 # Main
 # ============================================================
 
+from __future__ import annotations
+
 
 @dataclass
 class BuildConfig:

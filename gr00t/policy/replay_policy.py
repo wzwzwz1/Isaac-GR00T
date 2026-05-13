@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 """Replay Policy implementation for replaying actions from a dataset.
 
 This module provides a policy that replays recorded actions from a LeRobot-style dataset,

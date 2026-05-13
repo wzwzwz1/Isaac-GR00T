@@ -218,6 +218,8 @@ def replace_dit_with_tensorrt(policy: Gr00tPolicy | Any, trt_engine_path: str, d
 
 ###############################################################################
 # TENSORRT Module Wrappers End
+
+from __future__ import annotations
 ###############################################################################
 
 

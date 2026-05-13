@@ -67,6 +67,8 @@ import tyro
 
 
 # Ensure scripts/deployment/ is on sys.path for sibling module imports
+
+from __future__ import annotations
 _DEPLOY_DIR = os.path.dirname(os.path.abspath(__file__))
 if _DEPLOY_DIR not in sys.path:
     sys.path.insert(0, _DEPLOY_DIR)
